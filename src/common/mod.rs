@@ -3,15 +3,17 @@ pub mod lp_solver;
 pub use std::marker::PhantomData;
 pub use std::fmt::{Display, Debug};
 pub use std::cmp::Ordering;
+pub use std::hash::Hash;
 
+pub const EPS: f64 = 1e-9;
 pub trait Serializable {
     fn kind_sizes() -> Vec<usize>;
     fn serialize(&self) -> (usize, Vec<i32>);
 }
 
 pub trait PlayerTraits {
-    type Message: Display + Serializable + Clone + Debug;
-    type Choice: Display + Serializable + Clone + Debug;
+    type Message: Display + Serializable + Hash + Clone + Eq + Debug;
+    type Choice: Display + Serializable + Hash + Clone + Eq + Debug;
 }
 
 pub trait Game {

@@ -1,12 +1,12 @@
 use crate::common::*;
 
-#[derive(Clone, Debug)]
+#[derive(Clone, Hash, PartialEq, Eq, Debug)]
 pub struct TicTacToe {
     board: [[i32; 3]; 3],
     curr_player: i32
 }
 
-#[derive(Copy, Clone, Debug)]
+#[derive(Copy, Clone, Hash, PartialEq, Eq, Debug)]
 pub struct Choice {
     x: usize,
     y: usize,

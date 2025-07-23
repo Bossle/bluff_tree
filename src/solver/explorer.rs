@@ -16,8 +16,9 @@ impl<G: Game + Clone + Debug> GameInterface<G> for MockInterface<G> {
             Some(*choice)
         } else {
             assert!(self.recorded.is_none(), "recording should happen exactly once {:?}", self);
-            let node_type = NodeType::Random(v.clone(), p.clone());
-            let new_node = Tree::new_node(node_type, self.root.clone(), self.path.clone(), n);
+            let node_type = NodeType::Random(v.clone());
+            let mut new_node = Tree::new_node(node_type, self.root.clone(), self.path.clone(), n);
+            new_node.prob = Some(p.clone());
             self.recorded = Some(new_node);
             None
         }

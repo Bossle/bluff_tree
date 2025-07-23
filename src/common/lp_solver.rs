@@ -1,70 +1,60 @@
 use crate::common::*;
-use good_lp::solvers::coin_cbc::CoinCbcProblem;
-use good_lp::{self, coin_cbc, variable, Solution, SolverModel, Variable};
+use good_lp::{self, coin_cbc, variable, Solution, SolverModel};
 
 pub trait Solver {
-    type Checkpoint;
+    // todo: tie the variable to the solver instance
     type Variable: Clone;
-    fn new(var_capacity: usize) -> Self;
+    fn new() -> Self;
     fn new_var(&mut self) -> Self::Variable;
-    fn save_checkpoint(&self) -> Self::Checkpoint;
-    fn restore_checkpoint(&mut self, checkpoint: Self::Checkpoint);
-    fn add_constraint(&mut self, v: Vec<(f64, Self::Variable)>, o: Ordering, c: f64);
-    fn solve(&mut self, maximize_coeffs: Vec<(f64, Self::Variable)>) -> impl Fn(Variable) -> f64;
+    fn add_constraint(&mut self, v: &Vec<(f64, Self::Variable)>, o: Ordering, c: f64);
+    fn solve(&mut self, maximize_coeffs: Vec<(f64, Self::Variable)>) -> impl Fn(Self::Variable) -> f64;
 }
 
 pub struct DefaultSolver {
-    lp: CoinCbcProblem,
-    vars: Vec<Variable>,
-    goal: Variable,
     next_var: usize,
+    constraints: Vec<(Vec<(f64, usize)>, Ordering, f64)>,
 }
 
 impl Solver for DefaultSolver {
-    type Checkpoint = CoinCbcProblem;
-    type Variable = good_lp::Variable;
+    type Variable = usize;
 
-    fn new(var_capacity: usize) -> Self {
-        let mut problem = good_lp::variables!();
-        let goal = problem.add(variable());
-        let vars = problem.add_vector(variable(), var_capacity);
+    fn new() -> Self {
         DefaultSolver {
-            lp: problem.maximise(goal).using(coin_cbc),
-            vars: vars,
-            goal: goal,
             next_var: 0,
+            constraints: Vec::new(),
         }
     }
 
     fn new_var(&mut self) -> Self::Variable {
+        let v = self.next_var;
         self.next_var += 1;
-        self.vars[self.next_var-1]
+        return v;
     }
 
-    fn save_checkpoint(&self) -> Self::Checkpoint {
-        self.lp.clone()
+    fn add_constraint(&mut self, coeffs: &Vec<(f64, Self::Variable)>, ord: Ordering, constant: f64) {
+        self.constraints.push((coeffs.clone(), ord, constant));
     }
 
-    fn restore_checkpoint(&mut self, checkpoint: Self::Checkpoint) {
-        self.lp = checkpoint;
-    }
-
-    fn add_constraint(&mut self, coeffs: Vec<(f64, Self::Variable)>, ord: Ordering, constant: f64) {
-        let mut expr = good_lp::Expression::with_capacity(coeffs.len());
-        for (c, v) in coeffs {
-            expr = expr+c*v;
+    fn solve(&mut self, maximize_coeffs: Vec<(f64, Self::Variable)>) -> impl Fn(Self::Variable) -> f64 {
+        let mut problem = good_lp::variables!();
+        let vars = problem.add_vector(variable(), self.next_var);
+        let mut goal = good_lp::Expression::with_capacity(maximize_coeffs.len());
+        for (c, v) in maximize_coeffs {
+            goal = goal+c*vars[v]
         }
-        self.lp.add_constraint(match ord {
-            Ordering::Equal => expr.eq(constant),
-            Ordering::Greater => expr.geq(constant),
-            Ordering::Less => expr.leq(constant),
-        });
-    }
-
-    fn solve(&mut self, mut maximize_coeffs: Vec<(f64, Self::Variable)>) -> impl Fn(Variable) -> f64 {
-        maximize_coeffs.push((-1.0, self.goal));
-        self.add_constraint(maximize_coeffs, Ordering::Equal, 0.0);
-        let solution = self.lp.clone().solve().expect("lp system should be solvable");
-        move |v| solution.value(v)
+        let mut lp = problem.maximise(goal).using(coin_cbc);
+        for (coeffs, ord, constant) in &self.constraints {
+            let mut expr = good_lp::Expression::with_capacity(coeffs.len());
+            for (c, v) in coeffs {
+                expr = expr+*c*vars[*v];
+            }
+            lp.add_constraint(match ord {
+                Ordering::Equal => expr.eq(*constant),
+                Ordering::Greater => expr.geq(*constant),
+                Ordering::Less => expr.leq(*constant),
+            });
+        }
+        let solution = lp.clone().solve().expect("lp system should be solvable");
+        move |v| solution.value(vars[v])
     }
 }
