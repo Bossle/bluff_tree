@@ -37,6 +37,7 @@ impl<G: Game + Clone + Debug> Tree<G> {
 
     pub fn new(g: G) -> Tree<G> {
         let mut tree = explorer::make_node(g, vec![]);
+        explorer::expand_full(&mut tree);
         exact::solve(&mut tree);
         tree
     }
