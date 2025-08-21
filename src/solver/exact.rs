@@ -13,9 +13,11 @@ struct PlayerTree<S: Solver, P: PlayerTraits> {
 
 impl<S: Solver, P: PlayerTraits> PlayerTree<S, P> {
     fn new(s_strat: &mut S, s_value: &mut S) -> PlayerTree<S, P> {
+        let s = s_strat.new_var();
+        s_strat.add_constraint(&vec![(1., s.clone())], Ordering::Greater, 0.);
         PlayerTree {
             children: HashMap::new(),
-            strategy: s_strat.new_var(),
+            strategy: s,
             weighted_value: s_value.new_var(),
             end_corresps: Vec::new(),
             temp_end: Vec::new(),
@@ -120,6 +122,7 @@ fn extract_solution_rec<S: Solver, G: Game + Clone>(p1: &PlayerTree<S, G::P1>, p
         }
         Some(node) => {
             let prob: Vec<f64>;
+            let mut value = 0.;
             match node.node_type.clone() {
                 NodeType::Message1(m) => {
                     prob = vec![(1.)];
@@ -161,12 +164,14 @@ fn extract_solution_rec<S: Solver, G: Game + Clone>(p1: &PlayerTree<S, G::P1>, p
                 }
                 NodeType::End => {
                     prob = vec![];
+                    value = node.value.expect("end nodes should always have value");
                 }
             }
-            let mut value = 0.;
             for i in 0..node.children.len() {
                 if let Some(v) = node.children[i].as_ref().and_then(|n| n.value) {
-                    value += v*prob[i]
+                    if prob[i] > EPS {
+                        value += v*prob[i]
+                    }
                 }
             }
             node.prob = Some(prob);

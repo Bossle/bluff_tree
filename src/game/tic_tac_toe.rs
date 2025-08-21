@@ -15,7 +15,7 @@ pub struct Choice {
 impl TicTacToe {
     pub fn new() -> TicTacToe {
         TicTacToe {
-            board: [[0,0,0],[1,-1,-1],[-1,-1,1]],
+            board: [[0,0,0],[0,0,0],[0,0,0]],
             curr_player: 1,
         }
     }
